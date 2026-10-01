@@ -126,8 +126,8 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         pass
 
 def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
+    # Renderが指定するポート（10000番）で確実にWebサーバーを立ち上げます
+    server = HTTPServer(('0.0.0.0', 10000), SimpleHTTPRequestHandler)
     server.serve_forever()
 
 Thread(target=run_web, daemon=True).start()
