@@ -8,11 +8,19 @@ from threading import Thread
 # ==========================================
 # 🛠️ 設定項目（ここを自由に変えられます）
 # ==========================================
-# 【修正】乱数の上限を「8」にしました（1〜8の数字から「1」が出たら喋ります。確率約12.5%）
-# これで「割とチャットに出てくるな」という存在感になります。
-RANDOM_MAX = 8  
+RANDOM_MAX = 5  # 通常チャットでの発言頻度（1/5の確率）
 
-INITIAL_WORDS = ["なるほど", "たしかに", "おもしろい", "草", "すごい", "天才", "さすがに", "やばい", "まじで"]
+# 【新機能】メンションされた時に送る、あらかじめ設定された固定文章リスト
+PRESET_RESPONSES = [
+    "🧠 起きてます、起きてますよ。、たぶん。",
+    "マスター、サーヴァント遣いが荒いんじゃないのか？",
+    "ねてない！",
+    "( ˘ω˘)ｽﾔｧ",
+    "うるさあああああああああああああああああああああああああああああああああああい",
+    "は？"
+]
+
+INITIAL_WORDS = ["ねみい", "あほ", "おもしろい", "草", "天才", "さすがに", "やばい"]
 # ==========================================
 
 DATA_FILE = "learned_words.txt"
@@ -31,12 +39,12 @@ def save_word(word):
     with open(DATA_FILE, "a", encoding="utf-8") as f:
         f.write(f"\n{word}")
 
-# 文字の種類（漢字・ひらがな・カタカナ・英数字）の変わり目で単語を切り分ける関数
+# 文字種別で単語を切り分ける関数
 def split_by_script(text):
     pattern = re.compile(r'([\u4e00-\u9fff]+|[\u3040-\u309f]+|[\u30a0-\u30ff]+|[a-zA-Z0-9]+)')
     return [m.group(0) for m in pattern.finditer(text)]
 
-# 指定された確率比率（、:35%, 。:25%, !:20%, ?:20%）で記号を1つ選ぶ関数
+# 記号を選ぶ関数
 def choose_punctuation():
     dice = random.randint(1, 100)
     if dice <= 35:
@@ -54,16 +62,23 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
-    print(f"🤖 にあの左脳ちゃんがVer12(1/8確率版)で起動しました: {client.user}")
+    print(f"🤖 にあの左脳ちゃんがVer14(メンション強制アクティブ版)で起動しました: {client.user}")
 
 @client.event
 async def on_message(message):
     if message.author.bot:
         return
     
+    # --- 1. 【新機能】メンション（@にあの左脳）された場合の強制アクティブ処理 ---
+    if client.user in message.mentions:
+        # あらかじめ設定された文章からランダムに送信（確率は100%）
+        chosen_preset = random.choice(PRESET_RESPONSES)
+        await message.channel.send(chosen_preset)
+        return  # メンションの時はここで処理を終了して通常発言はスキップする
+
     content = message.content.strip()
 
-    # --- 1. 文字種判別による超軽量・自動単語学習機能 ---
+    # --- 2. 通常の自動単語学習機能 ---
     if content and not content.startswith(("http", "<:")):
         current_words = load_words()
         try:
@@ -77,12 +92,12 @@ async def on_message(message):
         except Exception as e:
             print(f"学習エラー: {e}")
 
-    # --- 2. 乱数ガチャによる発言頻度の制御（1/8の確率に微調整） ---
+    # --- 3. 乱数ガチャによる通常発言頻度の制御（1/5） ---
     if random.randint(1, RANDOM_MAX) == 1:
         words = load_words()
         
-        # 50%の確率で「絵文字だけ」、50%の確率で「ランダムな数の単語を密着させた文」にする
         if random.choice([True, False]):
+            # 【絵文字だけモード】
             custom_emojis = message.guild.emojis
             if custom_emojis:
                 chosen_emoji = random.choice(custom_emojis)
@@ -94,14 +109,13 @@ async def on_message(message):
             if words:
                 dice = random.randint(1, 100)
                 if dice <= 95:
-                    target_count = random.randint(5, 7) # 95%の確率で 5〜7個
+                    target_count = random.randint(5, 7)
                 else:
-                    target_count = random.randint(8, 9) # 5%の確率で 8〜9個
+                    target_count = random.randint(8, 9)
                 
                 word_count = min(target_count, len(words))
                 chosen_list = random.sample(words, word_count)
                 
-                # ── 30%の確率で単語の間に指定比率の記号を挟みながら結合する ──
                 reply_text = ""
                 for i, word in enumerate(chosen_list):
                     reply_text += word
@@ -126,7 +140,6 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         pass
 
 def run_web():
-    # Renderが指定するポート（10000番）で確実にWebサーバーを立ち上げます
     server = HTTPServer(('0.0.0.0', 10000), SimpleHTTPRequestHandler)
     server.serve_forever()
 
